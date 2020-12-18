@@ -1,54 +1,36 @@
-use std::{collections::HashMap, io::prelude::*};
+use std::{
+    collections::{HashMap, HashSet},
+    io::prelude::*,
+};
 use std::{fs::File, io::BufReader};
 
 type Vec4 = (i32, i32, i32, i32);
 
-fn simulate(world: &HashMap<Vec4, bool>, dirs: &Vec<Vec4>) {
-    let wake_neighbors = |pos: &Vec4, w: &mut HashMap<Vec4, bool>| {
-        for d in dirs.iter() {
-            let vn = (pos.0 + d.0, pos.1 + d.1, pos.2 + d.2, pos.3 + d.3);
-            w.entry(vn).or_insert(false);
-        }
-    };
-
-    let mut new_worlds = (world.clone(), HashMap::new());
-    let mut worlds = (&mut new_worlds.0, &mut new_worlds.1);
-
-    for (pos, &active) in worlds.0.iter() {
-        worlds.1.insert(*pos, active);
-        wake_neighbors(pos, worlds.1);
-    }
-    std::mem::swap(&mut worlds.0, &mut worlds.1);
-    worlds.1.clear();
+fn simulate(world: &HashSet<Vec4>, dirs: &Vec<Vec4>) {
+    let mut current = world.clone();
 
     for _ in 0..6 {
-        for (pos, &active) in worlds.0.iter() {
-            let mut near = 0;
+        let mut next = HashSet::new();
+        let mut countmap = HashMap::new();
+
+        for p in current.iter() {
             for d in dirs.iter() {
-                let vn = (pos.0 + d.0, pos.1 + d.1, pos.2 + d.2, pos.3 + d.3);
-                if *worlds.0.get(&vn).unwrap_or(&false) {
-                    near += 1;
-                }
-            }
-
-            let activate = if active {
-                near == 2 || near == 3
-            } else {
-                near == 3
-            };
-
-            worlds.1.insert(*pos, activate);
-
-            if activate {
-                wake_neighbors(pos, worlds.1);
+                *countmap
+                    .entry((p.0 + d.0, p.1 + d.1, p.2 + d.2, p.3 + d.3))
+                    .or_insert(0) += 1;
             }
         }
 
-        std::mem::swap(&mut worlds.0, &mut worlds.1);
-        worlds.1.clear();
+        for (p, &cnt) in countmap.iter() {
+            if current.contains(p) && cnt == 2 || cnt == 3 {
+                next.insert(*p);
+            }
+        }
+
+        current = next;
     }
 
-    println!("{:?}", worlds.0.values().filter(|&x| *x).count());
+    println!("{:?}", current.iter().count());
 }
 
 fn main() {
@@ -71,10 +53,12 @@ fn main() {
         }
     }
 
-    let mut world: HashMap<Vec4, bool> = HashMap::new();
+    let mut world = HashSet::new();
     for (y, line) in content.lines().enumerate() {
         for (x, c) in line.unwrap().chars().enumerate() {
-            world.insert((x as i32, y as i32, 0, 0), c == '#');
+            if c == '#' {
+                world.insert((x as i32, y as i32, 0, 0));
+            }
         }
     }
 
